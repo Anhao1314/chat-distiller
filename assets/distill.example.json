@@ -1,102 +1,96 @@
 {
-  "_说明": "distill.json 结构样例：会话1 是单主题（顶层字段 + categories）；会话2 是杂糅多主题（threads 分段）。categories 取值见 references/taxonomy.md，可多个；段内卡片省略 categories 时继承所属段。S/C 编号由脚本分配，这里不写。",
+  "_说明": "distill.json 完整样例（内容为合成的演示数据，不对应任何真实会话）。覆盖：单主题会话、多主题分段（threads）、五类卡片、状态标记、产物与待办。分类取值均来自 references/taxonomy.template.md。",
   "conversations": [
     {
-      "session_id": "38441505397102338",
-      "date": "2026-09-13",
-      "title": "苹果设计研究沉淀为 Obsidian 知识库并用 Git 备份",
-      "topic": "知识管理",
-      "categories": ["知识管理/Obsidian方法论", "知识管理/版本与备份"],
-      "tags": ["Obsidian", "知识库", "Git"],
+      "session_id": "example-0001",
+      "date": "2026-03-04",
+      "title": "家庭相册改用本地聚类并放弃云端方案",
+      "topic": "个人项目",
+      "categories": ["技术开发/开发环境", "工作与成长/决策记录"],
+      "tags": ["本地优先", "照片管理", "选型"],
       "value": "高",
-      "summary": "把一份苹果产品设计深度报告沉淀为 Obsidian 结构化知识库：按 MOC—主题—事实三级组织，配 Bases 与 Canvas，并用 Git 推送到远程仓库做版本备份。",
+      "summary": "把上万张家庭照片的整理从云端服务迁回本地。先试了云端人脸聚类，因隐私顾虑与免费额度不足放弃；最终选定本地模型加一套目录约定，并把整理脚本接进已有的备份流程。",
       "key_points": [
-        "长报告入库采用「MOC 总览—主题页—原子事实」三级结构，而非整篇粘贴",
-        "frontmatter、双链、callout 与既有库保持统一，便于 Bases 统一检索",
-        "用 Git 备份 vault，忽略 .obsidian/workspace 等本机状态文件"
+        "隐私敏感且无法撤回的数据，上云的长期成本高于自建",
+        "先定目录约定再挑工具，否则换工具时历史整理全部作废",
+        "本地聚类准确率够用，但首次全量索引要按小时计"
       ],
       "decisions": [
-        "选择本地 Markdown + Git 而非云端笔记，保证自主可控、可迁移"
+        "放弃云端人脸聚类：既不愿上传家人照片，免费额度也不足以支撑全量索引"
       ],
       "artifacts": [
-        {"name": "苹果产品设计研究 vault", "path_or_url": "~/Documents/我的知识库/My RAG/苹果产品设计研究"},
-        {"name": "远程备份仓库", "path_or_url": "https://github.com/Anhao1314/my-rag"}
+        {"name": "相册目录约定", "path_or_url": "~/Pictures/相册约定.md"},
+        {"name": "整理脚本仓库", "path_or_url": "https://example.com/album-tools"}
       ],
       "cards": [
         {
-          "kind": "method",
-          "title": "把一份长报告转成 Obsidian 知识库的标准结构",
-          "body": "先抽骨架做 MOC，再拆主题页，最后把可复用事实降为原子笔记并用双链回连；报告原文作为来源附件，不直接当笔记正文。",
-          "categories": ["知识管理/Obsidian方法论"],
-          "tags": ["MOC", "结构"],
-          "related": ["00 · 研究总览 MOC"]
+          "kind": "decision",
+          "title": "隐私敏感数据不自建就宁可不上云",
+          "body": "家人照片这类无法撤回的数据，云端方案的长期成本与合规风险都高于自建。先用本地模型验证效果够用，再判断是否值得上云。",
+          "categories": ["工作与成长/决策记录"],
+          "tags": ["隐私", "选型"]
         },
         {
           "kind": "method",
-          "title": "用 Git 备份 Obsidian vault 的步骤与忽略项",
-          "body": "在 vault 根 git init，写 .gitignore 忽略 .obsidian/workspace*.json 与 .trash，再 commit 并推送到远程私有仓库。",
-          "categories": ["知识管理/版本与备份"],
-          "tags": ["Git", "备份"]
+          "title": "先定目录约定再挑整理工具",
+          "body": "目录结构决定了工具能否替换；先写死一套按年份与事件分层的约定，再让工具去适配它。这张卡省略 categories，自动继承本会话的分类。"
         }
       ],
-      "related": ["00 · 研究总览 MOC"]
+      "related": ["00 · 对话沉淀 MOC"]
     },
     {
-      "session_id": "38441033732626178",
-      "date": "2026-09-10",
-      "title": "机械臂 Sim-to-Real 评审与 Agent 可信执行层转向",
-      "topic": "项目评审",
-      "categories": ["机器人与Agent/强化学习与Sim-to-Real", "机器人与Agent/Agent架构与可信执行"],
-      "tags": ["机器人", "强化学习", "Agent"],
-      "value": "高",
-      "summary": "一场杂糅会话：先评审机械臂 Sim-to-Real 项目并把 MVP 重定义为验证 Harness 同构，随后转向 Agent 可信执行层。顶层 summary 覆盖全场，细节按 threads 分段。",
+      "session_id": "example-0002",
+      "date": "2026-03-11",
+      "title": "三层备份策略与让 agent 代劳的边界",
+      "topic": "工作方法",
+      "categories": ["知识管理/版本与备份", "AI协作/协作边界"],
+      "tags": ["备份", "协作边界"],
+      "value": "中",
+      "summary": "一场杂糅会话：先定下照片与笔记的三层备份策略，随后转到一个反复出现的困惑——哪些事该交给 agent 代劳、哪些必须自己确认。顶层 summary 覆盖全场，细节按 threads 分段。",
       "threads": [
         {
-          "topic": "Sim-to-Real 评审与 MVP 重定义",
-          "categories": ["机器人与Agent/强化学习与Sim-to-Real"],
+          "topic": "三层备份策略",
+          "categories": ["知识管理/版本与备份"],
           "key_points": [
-            "分层架构的分层思想可迁移，但 RL 方法论不能直接迁移到接触丰富的操作任务",
-            "MVP 应验证 Harness 与 sim/real 同构，而非验证 RL 算法效果"
+            "同一份数据至少要有两个物理位置，且其中一个能离线",
+            "只做同步不算备份——同步会把误删一并同步过去"
           ],
           "decisions": [
-            "主角从训练策略换成 Harness 本身，端到端 PPO 抓放删除、后置"
+            "热备用对象存储、冷备用异地移动硬盘，两者都不依赖同一套账号"
           ],
-          "todos": ["确认主目标是学术研究还是工程平台"],
+          "todos": ["确认对象存储的版本控制是否真的开着"],
           "cards": [
             {
-              "kind": "decision",
-              "title": "Sim-to-Real 项目 MVP 应验证 Harness 同构而非 RL 算法",
-              "body": "先用脚本化技能跑通 Sim/MockReal/Real 三网关与一致性契约，再谈 RL；命题的风险全在真机闭环。",
-              "categories": ["机器人与Agent/强化学习与Sim-to-Real"]
-            },
-            {
-              "kind": "method",
-              "title": "MockRealGateway 伪真机模拟器设计",
-              "body": "在仿真与真机之间加一层可注入延迟、噪声、量化与模型错配的网关，离线扩大鲁棒性包线。这张卡省略 categories，自动继承本段分类。"
+              "kind": "lesson",
+              "title": "只做同步不叫备份",
+              "body": "单向同步和双向同步都会忠实传播误删与勒索加密。备份必须保留历史版本，且至少一份离线、不挂在系统上。",
+              "tags": ["备份"]
             }
           ]
         },
         {
-          "topic": "从机械臂转向 Agent 可信执行层",
-          "categories": ["机器人与Agent/Agent架构与可信执行"],
+          "topic": "哪些事该让 agent 代劳",
+          "categories": ["AI协作/协作边界"],
           "key_points": [
-            "Agent 主要矛盾已从能力转向可靠性、可验证性与安全工程化",
-            "定位为给会动手的 AI 做刹车、驾校与黑匣子的执行外壳"
-          ],
-          "decisions": [
-            "机械臂降级为未来最硬的执行后端，项目主角换成 Agent 可信执行层"
+            "不可逆的动作（删除、覆盖、外发）一律先确认再执行",
+            "探索性的、可回滚的工作可以放手让 agent 批量做"
           ],
           "cards": [
             {
-              "kind": "decision",
-              "title": "从 Agent 起步的定位：不做大脑做外壳",
-              "body": "不追求更聪明的大脑，而做包住大脑的确定性可信执行与验证外壳，形成差异化。",
-              "categories": ["机器人与Agent/Agent架构与可信执行"]
+              "kind": "method",
+              "title": "按可逆性划分 agent 的自主范围",
+              "body": "先判断动作能不能撤销，再决定要不要请示：可逆的放手做，不可逆的先说明再动手。这条比按任务大小划分更稳。",
+              "categories": ["AI协作/协作边界"]
+            },
+            {
+              "kind": "fact",
+              "title": "批量操作前的自检惯例",
+              "body": "对一批文件执行改名、移动、删除之前，先用 dry-run 或列清单的方式把将要发生的事打印出来核对一遍。",
+              "categories": ["AI协作/协作边界"]
             }
           ]
         }
-      ],
-      "related": []
+      ]
     }
   ]
 }

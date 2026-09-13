@@ -46,12 +46,12 @@
 
 | 字段 | 必填 | 规范 |
 | --- | --- | --- |
-| `session_id` | 是 | 与 transcript frontmatter 一致，用于回溯 |
+| `session_id` | 是 | 与 transcript frontmatter 一致，用于回溯。**必须唯一且非空**——笔记名、S 编号与卡片归属都以它为键，重复会让前一个会话的笔记被静默覆盖，脚本会直接报错退出 |
 | `date` | 是 | `YYYY-MM-DD`，取会话创建日（北京时间） |
 | `title` | 是 | 10–28 字结论性标题（不是“关于xx的对话”）；不要手写编号、不必刻意在中英文间加空格——脚本会自动分配 S 编号、补中英文空格并用于文件名/H1 |
 | `topic` | 是 | 单一主题分类，用于 MOC 分组，如「知识管理」「开发环境」「项目评审」 |
 | `tags` | 是 | 0–6 个短关键词，不带 `#`、不必加命名空间；脚本统一收纳为 `对话沉淀/关键词/<标签>`，并自动补 `对话沉淀/会话`、`对话沉淀/<topic>` |
-| `categories` | 是 | **领域分类**，取值必须是 `references/taxonomy.md` 里的 `一级/二级`，可多个（会话整体涉及几个领域就列几个）；与 kind（知识性质）正交 |
+| `categories` | 是 | **领域分类**，取值必须是 vault 词表（`<vault>/<subdir>/.chat-distiller/taxonomy.md`）里的 `一级/二级`，可多个（会话整体涉及几个领域就列几个）；与 kind（知识性质）正交 |
 | `value` | 是 | 高/中/低/弃 |
 | `summary` | 是 | 2–4 句：这段对话解决了什么、得到了什么，自洽可独立阅读 |
 | `key_points` | 是 | 3–7 条核心要点（结论性，非操作流水） |
@@ -62,8 +62,12 @@
 | `threads` | 否 | 多主题分段数组，仅当一个会话杂糅多个领域时使用，结构见下；单主题会话不用填 |
 | `related` | 否 | 双链到 vault 已有笔记的**笔记名（不含 .md）**，用于织入现有知识网 |
 
-卡片对象：`{kind, title, body, categories?, tags?, related?}`
+卡片对象：`{kind, title, body, status?, superseded_by?, categories?, tags?, related?}`
 - `title`：卡片结论性短标题；`body`：1–3 句自包含正文。
+- `status`：`现行`（默认）/`已过期`/`有争议`。**知识会过期**——这个字段是给检索用的：
+  旧结论留在库里不删，但要让 agent 知道它已经不作数了。
+- `superseded_by`：取代它的新卡片，写卡片的完整显示名（如 `C21 - 改用容器隔离后的取舍标准`）。
+  `status` 非「现行」时应一并给出。
 - `categories`：卡片所属 `一级/二级` 领域（可多个）；**缺省时脚本让卡片继承所属主题段（threads）或会话的分类**，所以同段同类卡片可省略、只在跨领域时显式覆盖。
 - `tags`/`related` 可选。
 - 会话短 ID（S01、S02…）与卡片编号（C01、C02…）都由脚本按 conversations 与 threads 顺序连续分配，**不要自己编号**；会话日期只进 frontmatter，不进文件名。
@@ -71,18 +75,18 @@
 主题段对象（`threads[]`）：`{topic, categories, summary?, key_points?, decisions?, todos?, cards?}`
 - `topic`：这段主题的小标题；`categories`：这段的领域（通常 1 个，可多个）。
 - 一个会话先在顶层写覆盖全场的 `summary`，再把要点/决策/待办/卡片分别归进各段；脚本会在一篇会话笔记内按 `### 序号. 段标题` 分段，并把各段待办汇总到文末。
-- 判断要不要分段：若同一会话明显跨越两个及以上二级领域（如先做机器人 Sim-to-Real 评审、后转向 Agent 架构、又聊商业化），就分 threads；始终围绕单一主题则用顶层字段、保持扁平。
+- 判断要不要分段：若同一会话明显跨越两个及以上二级领域（如先聊知识库结构、再转去讨论部署与备份），就分 threads；始终围绕单一主题则用顶层字段、保持扁平。
 
-## 领域分类怎么做（先读 taxonomy）
+## 领域分类怎么做（先读 vault 词表）
 
-1. 浓缩**前先读 `references/taxonomy.md`**，在其两级树里为每段内容、每张卡选 `一级/二级`，可多属。
+1. 浓缩**前先读词表** `<vault>/<subdir>/.chat-distiller/taxonomy.md`，在其两级树里为每段内容、每张卡选 `一级/二级`，可多属。首次渲染时脚本会从 skill 自带的 `references/taxonomy.template.md` 播种一份。
 2. **优先复用**已有分类，不造近义词；确无匹配的二级分类可新增（紧凑标识、不含空格），连一级都不匹配才新增一级。
-3. 脚本会把不在词表的分类列入报告 `new_categories` 与 warnings——交付前要么改成已有分类，要么把新分类回填进 `taxonomy.md` 的清单块，保持受控。
+3. 脚本会把不在词表的分类列入报告 `new_categories` 与 warnings——交付前要么改成已有分类，要么把新分类回填进 vault 词表的清单块，保持受控（回填的是 vault 里那份，不是 skill 里的模板）。
 
 ## 浓缩操作流程
 
 1. 读 `sessions_index.md` 总览，按价值先挑「高/中」会话，决定纳入哪些（弃的跳过）。
-2. **先读 `references/taxonomy.md`**，浓缩时随时把内容对应到 `一级/二级` 领域。
+2. **先读 vault 词表**（`.chat-distiller/taxonomy.md`），浓缩时随时把内容对应到 `一级/二级` 领域。
 3. 逐篇打开对应 `transcripts/<id>.transcript.md`：
    - 先读「用户需求时间线」搞清目标与演进；
    - 再读「助手关键回复」，通常**每轮最后一条回复**是该轮结论，中间多为过程；
@@ -91,15 +95,22 @@
 4. 按上表写一个会话对象（含 `categories`，杂糅则写 `threads`）；价值高的再抽卡片，卡片按所属领域给 `categories`（同段可省略以继承）。
 5. `related` 前先列出 vault 已有笔记名（`find <vault> -name '*.md'`），只链接真实存在的，
    避免死链；脚本也会做死链检查并在 stderr 列出。
+
+   **同时看一眼 `知识索引.md`**：如果本次要抽的卡片和已有卡片讲的是同一件事，
+   优先把新信息并进已有卡片（改 body、补 `related`），而不是再造一张近似的。
+   卡片重复对人是烦，对检索是毒——近重复会互相抢排名。
+
+   如果新会话**推翻了**旧卡片的结论，不要删旧卡：把旧卡标成
+   `status: 已过期` + `superseded_by`，保留「当时为什么那么想」。
 6. 合成一个 distill.json，先用 `--dry-run` 预览，再正式渲染（命令见 SKILL.md）。
-7. 根据脚本报告处理 `new_categories`（回填 taxonomy 或改用已有分类）、`dead_links`、`orphans`、
+7. 根据脚本报告处理 `new_categories`（回填 vault 词表或改用已有分类）、`dead_links`、`orphans`、
    `warnings`，全部清零或确认可接受后交付。
 
 ## 与现有 Obsidian 库对齐
 
-- 默认写入 vault 的 `对话沉淀/` 子目录，不改动既有「苹果产品设计研究/」等内容。
+- 默认写入 vault 的 `对话沉淀/` 子目录，不改动库里既有的其他文件夹。
 - frontmatter 风格与既有库一致（层级 tags、callout、双链）；会话笔记 `type: conversation-note`，
-  卡片 `type: atomic-card`，由「对话沉淀索引.base」统一管理。
-- 跨库关联用 `related`：例如某会话讨论苹果设计，可链到已有 `00 · 研究总览 MOC`，
+  卡片 `type: atomic-card`，由「沉淀索引.base」统一管理。
+- 跨库关联用 `related`：例如某会话讨论的设计话题，可链到你库里已有的研究 MOC，
   让对话沉淀自然织进既有知识网络，而不是另成孤岛。
 - 语言与用户一致（默认简体中文）；标题、文件名由脚本做非法字符清洗，无需手工处理。
