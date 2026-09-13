@@ -6,6 +6,7 @@
 职责（确定性、零第三方依赖，只用标准库）：
   1. 扫描 sessions-root 下每个会话目录；
   2. 从 assignment.md 取「用户每轮需求」（最干净，append-only）；
+     该文件缺失时回退到 trajectory 的 user 消息，并在清单里标记「降级」；
   3. 从 trajectory.jsonl 取「助手最终文本回复」，丢弃 tool 结果与工具调用噪声；
   4. 剥离系统注入块 / 压缩摘要块 / 思考块（只剥固定白名单，绝不误删用户粘贴的合法 XML）；
   5. 为每个会话输出一份可读 transcript.md，并汇总 sessions_index.json / .md。
@@ -16,7 +17,7 @@ agent 阅读 transcript 后完成，再交给 render_notes.py 渲染成 Obsidian
 用法：
   python3 extract_sessions.py
   python3 extract_sessions.py --sessions-root <.sessions> --out <staging目录>
-  python3 extract_sessions.py --only 38440909037504770        # 只处理单个会话
+  python3 extract_sessions.py --only <session_id>             # 只处理单个会话
   python3 extract_sessions.py --keep-tool-trail               # 额外保留工具名操作轨迹
 输出默认放在当前目录的 _kb_staging/ 下，可重复运行、幂等覆盖，不触碰 Obsidian 库。
 """
@@ -51,7 +52,7 @@ def strip_system_blocks(text: str) -> str:
     for tag in SYSTEM_BLOCK_TAGS:
         text = re.sub(rf"<{re.escape(tag)}\b.*?</{re.escape(tag)}>",
                       "", text, flags=re.DOTALL | re.IGNORECASE)
-        # 极少数只有开标签没有闭标签的情况：删到行尾
+        # 极少数只有开标签没有闭标签的情况：只删掉开标签本身，其后正文原样保留
         text = re.sub(rf"<{re.escape(tag)}\b[^>]*>", "", text, flags=re.IGNORECASE)
     return text
 
@@ -119,11 +120,15 @@ def parse_assignment(path: str):
     return turns
 
 
-def parse_trajectory(path: str, keep_tool_trail: bool):
-    """返回 (助手回复列表[(文本)], 工具名轨迹列表, 坏行数)。"""
-    replies, tool_trail, bad = [], [], 0
+def parse_trajectory(path: str, keep_tool_trail: bool, collect_users: bool = False):
+    """返回 (助手回复列表, 工具名轨迹列表, 坏行数, 用户消息列表)。
+
+    collect_users 只在 assignment.md 缺失/为空时打开：那种情况下没有更干净的来源，
+    只能拿 trajectory 的 user 消息兜底。它们常夹带系统注入与上下文重放，故默认不收集。
+    """
+    replies, tool_trail, bad, users = [], [], 0, []
     if not path or not os.path.isfile(path):
-        return replies, tool_trail, bad
+        return replies, tool_trail, bad, users
     for line in open(path, encoding="utf-8"):
         line = line.strip()
         if not line:
@@ -144,8 +149,12 @@ def parse_trajectory(path: str, keep_tool_trail: bool):
                         tool_trail.append(tc["function"]["name"])
                     except (KeyError, TypeError):
                         pass
-        # role == 'tool' 的工具结果一律丢弃；user 消息以 assignment 为准，避免与重放内容重复
-    return replies, tool_trail, bad
+        elif role == "user" and collect_users:
+            txt = clean_text(o.get("content"))
+            if txt:
+                users.append(txt)
+        # role == 'tool' 的工具结果一律丢弃；user 消息默认以 assignment 为准，避免与重放内容重复
+    return replies, tool_trail, bad, users
 
 
 def find_agent_files(session_dir: str):
@@ -169,7 +178,7 @@ def slug_preview(text: str, n: int = 120) -> str:
 
 
 def build_transcript(session_id, created_cn, updated_cn, turns, replies, tool_trail,
-                     agent_ids, bad_lines, rel_source):
+                     agent_ids, bad_lines, rel_source, degraded):
     L = []
     L.append("---")
     L.append(f"session_id: {session_id}")
@@ -186,6 +195,11 @@ def build_transcript(session_id, created_cn, updated_cn, turns, replies, tool_tr
     L.append(f"> 时间：{created_cn or '未知'} → {updated_cn or '未知'}（北京时间）  |  "
              f"用户 {len(turns)} 轮 / 助手关键回复 {len(replies)} 条  |  来源：`{rel_source}`")
     L.append("")
+    if degraded:
+        L.append("> [!warning] 提取降级（浓缩时请留意）")
+        for d in degraded:
+            L.append(f"> - {d}")
+        L.append("")
     L.append("## 一、用户需求时间线")
     L.append("")
     if turns:
@@ -195,7 +209,7 @@ def build_transcript(session_id, created_cn, updated_cn, turns, replies, tool_tr
             L.append(body)
             L.append("")
     else:
-        L.append("_（assignment.md 缺失或为空，需回退阅读 trajectory 的 user 消息）_")
+        L.append("_（未提取到用户需求：assignment.md 缺失，且 trajectory 中没有可用的 user 文本）_")
         L.append("")
     L.append("## 二、助手关键回复（结论与产出）")
     L.append("")
@@ -227,19 +241,27 @@ def process(session_dir, out_dir, keep_tool_trail):
     session_id = os.path.basename(session_dir.rstrip(os.sep))
     agents = find_agent_files(session_dir)
     all_turns, all_replies, all_trail, agent_ids = [], [], [], []
+    degraded = []
     total_bad = 0
     iso_first = iso_last = None
     for agent_id, afile, tfile in agents:
         agent_ids.append(agent_id)
         turns = parse_assignment(afile)
-        replies, trail, bad = parse_trajectory(tfile, keep_tool_trail)
+        # assignment.md 是首选来源；缺失/为空时才回头收集 trajectory 的 user 消息兜底
+        replies, trail, bad, user_msgs = parse_trajectory(
+            tfile, keep_tool_trail, collect_users=not turns)
         total_bad += bad
+        if not turns and user_msgs:
+            turns = [("", "", t) for t in user_msgs]
+            degraded.append(f"{agent_id}: assignment.md 缺失或为空，用户 {len(user_msgs)} 轮"
+                            f"回退自 trajectory；这些消息可能残留系统注入，浓缩时需甄别")
         # 多 agent 时按 agent 顺序简单拼接（本环境均为单 agent）
         for t in turns:
             all_turns.append(t)
             iso = t[0]
-            iso_first = iso if iso_first is None else min(iso_first, iso)
-            iso_last = iso if iso_last is None else max(iso_last, iso)
+            if iso:  # 回退轮次没有时间戳，跳过以免首尾时间被空串污染
+                iso_first = iso if iso_first is None else min(iso_first, iso)
+                iso_last = iso if iso_last is None else max(iso_last, iso)
         all_replies.extend(replies)
         all_trail.extend(trail)
     # 时间：优先 assignment 首尾；否则目录 mtime
@@ -256,7 +278,7 @@ def process(session_dir, out_dir, keep_tool_trail):
     tpath = os.path.join(out_dir, "transcripts", tname)
     rel_source = f".sessions/{session_id}"
     md = build_transcript(session_id, created_cn, updated_cn, all_turns, all_replies,
-                          all_trail, agent_ids, total_bad, rel_source)
+                          all_trail, agent_ids, total_bad, rel_source, degraded)
     open(tpath, "w", encoding="utf-8").write(md)
     first_req = slug_preview(all_turns[0][2]) if all_turns else ""
     return {
@@ -268,6 +290,7 @@ def process(session_dir, out_dir, keep_tool_trail):
         "assistant_replies": len(all_replies),
         "chars": chars,
         "agents": agent_ids,
+        "degraded": degraded,
         "transcript": f"transcripts/{tname}",
         "empty": (len(all_turns) == 0 and len(all_replies) == 0),
     }
@@ -279,14 +302,17 @@ def write_index(records, out_dir):
         json.dump(records, f, ensure_ascii=False, indent=2)
     L = ["# 会话清单（extract_sessions 生成）", "",
          f"共 {len(records)} 个会话，按时间升序。agent 据此挑选有沉淀价值的会话做浓缩。", "",
-         "| # | 时间 | 用户首轮需求（截断） | 轮次 | 回复 | 字数 | 空 | 转录 |",
+         "标记列：⚠️空＝无任何用户轮次与助手回复；⚠️降级＝assignment.md 缺失，"
+         "用户轮次回退自 trajectory。", "",
+         "| # | 时间 | 用户首轮需求（截断） | 轮次 | 回复 | 字数 | 标记 | 转录 |",
          "| --- | --- | --- | --- | --- | --- | --- | --- |"]
     for i, r in enumerate(records, 1):
         req = r["first_request"].replace("|", "\\|").replace("\n", " ")
         if len(req) > 60:
             req = req[:60] + "…"
+        mark = '⚠️空' if r["empty"] else ('⚠️降级' if r.get("degraded") else '')
         L.append(f"| {i} | {r['created']} | {req} | {r['user_turns']} | "
-                 f"{r['assistant_replies']} | {r['chars']} | {'⚠️' if r['empty'] else ''} "
+                 f"{r['assistant_replies']} | {r['chars']} | {mark} "
                  f"| [[{r['transcript'].replace('transcripts/','').replace('.transcript.md','')}]] |")
     open(os.path.join(out_dir, "sessions_index.md"), "w", encoding="utf-8").write("\n".join(L) + "\n")
 
