@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.codex/skills/chat-distiller/scripts/compact_hook.py\" --vault \"$HOME/Documents/你的知识库\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.codex/skills/chat-distiller/scripts/compact_hook.py\" --vault \"$HOME/Documents/你的知识库\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
