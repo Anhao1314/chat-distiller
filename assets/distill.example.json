@@ -1,0 +1,102 @@
+{
+  "_说明": "distill.json 结构样例：会话1 是单主题（顶层字段 + categories）；会话2 是杂糅多主题（threads 分段）。categories 取值见 references/taxonomy.md，可多个；段内卡片省略 categories 时继承所属段。S/C 编号由脚本分配，这里不写。",
+  "conversations": [
+    {
+      "session_id": "38441505397102338",
+      "date": "2026-09-13",
+      "title": "苹果设计研究沉淀为 Obsidian 知识库并用 Git 备份",
+      "topic": "知识管理",
+      "categories": ["知识管理/Obsidian方法论", "知识管理/版本与备份"],
+      "tags": ["Obsidian", "知识库", "Git"],
+      "value": "高",
+      "summary": "把一份苹果产品设计深度报告沉淀为 Obsidian 结构化知识库：按 MOC—主题—事实三级组织，配 Bases 与 Canvas，并用 Git 推送到远程仓库做版本备份。",
+      "key_points": [
+        "长报告入库采用「MOC 总览—主题页—原子事实」三级结构，而非整篇粘贴",
+        "frontmatter、双链、callout 与既有库保持统一，便于 Bases 统一检索",
+        "用 Git 备份 vault，忽略 .obsidian/workspace 等本机状态文件"
+      ],
+      "decisions": [
+        "选择本地 Markdown + Git 而非云端笔记，保证自主可控、可迁移"
+      ],
+      "artifacts": [
+        {"name": "苹果产品设计研究 vault", "path_or_url": "~/Documents/我的知识库/My RAG/苹果产品设计研究"},
+        {"name": "远程备份仓库", "path_or_url": "https://github.com/Anhao1314/my-rag"}
+      ],
+      "cards": [
+        {
+          "kind": "method",
+          "title": "把一份长报告转成 Obsidian 知识库的标准结构",
+          "body": "先抽骨架做 MOC，再拆主题页，最后把可复用事实降为原子笔记并用双链回连；报告原文作为来源附件，不直接当笔记正文。",
+          "categories": ["知识管理/Obsidian方法论"],
+          "tags": ["MOC", "结构"],
+          "related": ["00 · 研究总览 MOC"]
+        },
+        {
+          "kind": "method",
+          "title": "用 Git 备份 Obsidian vault 的步骤与忽略项",
+          "body": "在 vault 根 git init，写 .gitignore 忽略 .obsidian/workspace*.json 与 .trash，再 commit 并推送到远程私有仓库。",
+          "categories": ["知识管理/版本与备份"],
+          "tags": ["Git", "备份"]
+        }
+      ],
+      "related": ["00 · 研究总览 MOC"]
+    },
+    {
+      "session_id": "38441033732626178",
+      "date": "2026-09-10",
+      "title": "机械臂 Sim-to-Real 评审与 Agent 可信执行层转向",
+      "topic": "项目评审",
+      "categories": ["机器人与Agent/强化学习与Sim-to-Real", "机器人与Agent/Agent架构与可信执行"],
+      "tags": ["机器人", "强化学习", "Agent"],
+      "value": "高",
+      "summary": "一场杂糅会话：先评审机械臂 Sim-to-Real 项目并把 MVP 重定义为验证 Harness 同构，随后转向 Agent 可信执行层。顶层 summary 覆盖全场，细节按 threads 分段。",
+      "threads": [
+        {
+          "topic": "Sim-to-Real 评审与 MVP 重定义",
+          "categories": ["机器人与Agent/强化学习与Sim-to-Real"],
+          "key_points": [
+            "分层架构的分层思想可迁移，但 RL 方法论不能直接迁移到接触丰富的操作任务",
+            "MVP 应验证 Harness 与 sim/real 同构，而非验证 RL 算法效果"
+          ],
+          "decisions": [
+            "主角从训练策略换成 Harness 本身，端到端 PPO 抓放删除、后置"
+          ],
+          "todos": ["确认主目标是学术研究还是工程平台"],
+          "cards": [
+            {
+              "kind": "decision",
+              "title": "Sim-to-Real 项目 MVP 应验证 Harness 同构而非 RL 算法",
+              "body": "先用脚本化技能跑通 Sim/MockReal/Real 三网关与一致性契约，再谈 RL；命题的风险全在真机闭环。",
+              "categories": ["机器人与Agent/强化学习与Sim-to-Real"]
+            },
+            {
+              "kind": "method",
+              "title": "MockRealGateway 伪真机模拟器设计",
+              "body": "在仿真与真机之间加一层可注入延迟、噪声、量化与模型错配的网关，离线扩大鲁棒性包线。这张卡省略 categories，自动继承本段分类。"
+            }
+          ]
+        },
+        {
+          "topic": "从机械臂转向 Agent 可信执行层",
+          "categories": ["机器人与Agent/Agent架构与可信执行"],
+          "key_points": [
+            "Agent 主要矛盾已从能力转向可靠性、可验证性与安全工程化",
+            "定位为给会动手的 AI 做刹车、驾校与黑匣子的执行外壳"
+          ],
+          "decisions": [
+            "机械臂降级为未来最硬的执行后端，项目主角换成 Agent 可信执行层"
+          ],
+          "cards": [
+            {
+              "kind": "decision",
+              "title": "从 Agent 起步的定位：不做大脑做外壳",
+              "body": "不追求更聪明的大脑，而做包住大脑的确定性可信执行与验证外壳，形成差异化。",
+              "categories": ["机器人与Agent/Agent架构与可信执行"]
+            }
+          ]
+        }
+      ],
+      "related": []
+    }
+  ]
+}

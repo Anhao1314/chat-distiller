@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.DS_Store
+# 运行时中间产物（干净转录与清单），不进 skill 仓库
+_kb_staging/
