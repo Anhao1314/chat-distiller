@@ -41,16 +41,18 @@ chat-distiller 就是把这套方法论用在你和 agent 的对话上：对话�
 ├── 知识索引.md / .jsonl      # 给 agent 与程序化检索的紧凑索引
 ├── 操作日志.md               # append-only，记录每次摄入与变化
 ├── 沉淀索引.base             # Obsidian Bases 视图
-├── .chat-distiller/          # 本库自带的配置（词表等）
+├── .chat-distiller/          # 本库自带：taxonomy.md 词表、distill.json 渲染源、pending/ 待蒸馏
 ├── 会话笔记/Snn - 标题.md     # Snn 稳定短 ID（日期在 frontmatter）
 └── 知识卡片/Cnn - 标题.md     # 五类卡片，带状态字段
 ```
 
 ## 特性
 
-- **零第三方依赖**：三个脚本只用 Python 标准库；同一输入幂等产出同一结果。
-- **自带回归测试**：`python3 -m unittest discover -s tests`，20 个用例覆盖提取回退、
-  YAML 转义、死链校验、索引与日志、状态标记、证据核验。
+- **零第三方依赖**：四个脚本只用 Python 标准库；同一输入幂等产出同一结果。
+- **自带回归测试**：`python3 -m unittest discover -s tests`，28 个用例覆盖提取回退、
+  YAML 转义、死链校验、索引与日志、状态标记、证据核验、压缩触发边界。
+- **压缩时自动接回**：agent 的上下文被压缩后，`SessionStart` hook 会把「先查索引」的提醒
+  注入模型上下文；压缩前记下一条待蒸馏标记。Codex 与 Claude Code 同一套配置。
 - **知识库自描述**：分类词表、源数据、索引、日志都住在 vault 里，跟数据走而不是跟工具走；
   换机器、换工具版本都不会分裂。
 - **两套正交分类**：`kind`（方法 / 事实 / 决策 / 教训 / 资源）× `categories`
@@ -100,6 +102,17 @@ python3 scripts/lint_notes.py --vault "/path/to/your/vault" \
 
 `render_notes.py` 的 `--dry-run` 同样会给出完整的死链、孤儿与新分类报告——预览是真的预览。
 报告里 `created`/`updated` 只算知识内容，索引与日志这类派生文件单列在 `meta_changed`。
+
+### 让 agent 在看不清的时候想起它
+
+知识库有个尴尬之处：它最该被用到的时刻，恰恰是 agent 在做别的工作、压根没加载这个 skill 的时候。
+两层接法（细节见 `SKILL.md`）：
+
+- **常态**：往项目 `AGENTS.md` 加一句「涉及历史决策先读 `知识索引.md`」。
+- **压缩时**：AGENTS.md 表达不了「当……的时候」。上下文压缩是最该想起知识库的一刻——agent 刚
+  丢掉细节、最容易凭印象编。把 `assets/hooks.example.json` 填好路径放进 `~/.codex/hooks.json`
+  或 `~/.claude/settings.json`，`scripts/compact_hook.py` 就会在两个工具的同名事件上工作：
+  压缩后注入提醒（`SessionStart` / `compact`），压缩前记下待蒸馏标记（`PreCompact`）。
 
 ## 分类词表
 

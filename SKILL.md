@@ -7,8 +7,10 @@ description: >-
   「把以前的对话做成知识卡片/MOC」时使用。流水线为：脚本确定性提取干净转录 → agent 语义
   浓缩为 distill.json → 脚本确定性渲染成 Obsidian 会话笔记、原子知识卡片、MOC、Bases 视图、
   知识索引（.md / .jsonl）与操作日志 → 脚本做结构一致性与证据核验，agent 按规则做矛盾与过期
-  判断。分类词表住在知识库里、跟着数据走。输出与既有 vault 相同的 frontmatter / 双链 / callout
-  规范。不用于实时对话、飞书云文档导出或网页采集。
+  判断。分类词表住在知识库里、跟着数据走。另附压缩触发器（scripts/compact_hook.py）：在
+  Codex / Claude Code 的上下文压缩事件上，压缩后注入「先查索引」的提醒、压缩前记下待蒸馏会话；
+  当用户说「压缩后 agent 就忘了之前的决定」「让 agent 自己想起知识库」时也用它。输出与既有
+  vault 相同的 frontmatter / 双链 / callout 规范。不用于实时对话、飞书云文档导出或网页采集。
 ---
 
 # 对话缓存 → Obsidian 知识库
@@ -24,7 +26,7 @@ MOC + Bases」的可生长知识网络。**确定性的事交给脚本，需要�
 ├── 知识索引.md / .jsonl      # 给 agent 与程序化检索的紧凑索引（脚本生成，勿手改）
 ├── 操作日志.md               # append-only，记录每次摄入新增/更新了哪些 S/C
 ├── 沉淀索引.base              # 全部/按主题/按领域/高价值/卡片/待跟进 等视图
-├── .chat-distiller/          # 本库自带配置：taxonomy.md（受控领域词表）
+├── .chat-distiller/          # 本库自带配置：taxonomy.md（词表）、distill.json（渲染源）、pending/（待蒸馏）
 ├── 会话笔记/Snn - 标题.md      # Snn 稳定短 ID（日期留在 frontmatter），H1 为「# Snn · 标题」
 └── 知识卡片/Cnn - 标题.md      # method/fact/decision/lesson/resource，H1 为「# Cnn · 标题」
 ```
@@ -70,6 +72,8 @@ python3 "$SK/scripts/extract_sessions.py" \
 - 先读 `references/distillation-schema.md`（价值分级、卡片类型、字段规范，必读）与
   **vault 词表** `<vault>/对话沉淀/.chat-distiller/taxonomy.md`（受控两级领域分类，浓缩前先读、
   边浓缩边归类；库里还没有时，渲染脚本会先从 `references/taxonomy.template.md` 播种一份）。
+- **先看 `.chat-distiller/pending/`**：里面有标记的会话说明它的上下文被压缩过（塞满过窗口），
+  值得沉淀的结论大概率就在那几个里，优先处理。
 - 按 `sessions_index.md` 挑「高/中」价值会话，逐篇读 transcript：抓用户目标 + 各轮最终结论，
   跳过命令流水与工具输出；超大会话只读需求与结论段。
 - 判定领域与结构：单一主题走顶层字段；**一个会话跨两个及以上二级领域（杂糅）就用 `threads`
@@ -137,7 +141,9 @@ python3 "$SK/scripts/lint_notes.py" --vault "<vault 路径>" \
 **这一步不做，前面全是白搭。** SKILL.md 只在 skill 被触发时加载，而知识库最该发挥作用的时刻，
 恰恰是 agent 在做**别的工作**、需要回想你的历史决策的时候——那时候 skill 根本没被触发。
 
-所以触发规则要写进**你项目的 `AGENTS.md`**（或全局指令），例如：
+分两层接，因为这是两件性质不同的事。
+
+### 常态：一句话写进 AGENTS.md
 
 ```markdown
 ## 历史决策
@@ -148,6 +154,32 @@ python3 "$SK/scripts/lint_notes.py" --vault "<vault 路径>" \
 ```
 
 如果用户的 vault 路径已知，主动帮他把这几行加到项目的 `AGENTS.md` 里；加完告诉他加了什么。
+
+### 压缩时：交给 hook，别写在 AGENTS.md 里
+
+AGENTS.md 是**每一轮都在**的静态指令，表达不了「当……的时候」。而上下文压缩恰恰是最该想起
+知识库的时刻——那一刻 agent 刚丢掉细节，最容易凭残存的印象编。
+
+Codex 与 Claude Code 都为此提供了同名事件，`scripts/compact_hook.py` 两个都适配：
+
+| 事件 | 何时触发 | 脚本做什么 |
+| --- | --- | --- |
+| `SessionStart`，matcher `compact` | 压缩刚发生、**下一次模型请求之前** | 把提醒打到 stdout——两个工具都会把这段纯文本注入模型上下文 |
+| `PreCompact`，matcher `manual\|auto` | 压缩之前 | 在 `.chat-distiller/pending/` 写一条标记：这个会话的上下文溢出过 |
+
+配置模板见 `assets/hooks.example.json`（两个工具是同一个 `{"hooks": {…}}` 形状），把里面的
+skill 路径与 vault 路径换成你的，然后：
+
+- **Codex**：放进 `~/.codex/hooks.json`（或项目里的 `.codex/hooks.json`）。首次要在 `/hooks` 里
+  审阅并信任一次——没被信任的 hook 会被跳过。
+- **Claude Code**：放进 `~/.claude/settings.json`（或项目里的 `.claude/settings.json`），
+  用 `/hooks` 确认已注册（那个菜单是只读的，改动直接编辑 JSON）。
+
+脚本的约定是**失败必须无声**：一切异常都 exit 0，hook 出错绝不能打断用户正在进行的会话；
+默认只在**索引确实存在**时才注入，库还没建起来时它不会说废话。排查用 `--debug`。
+
+注入的提醒刻意很短（约 150 token，两个工具的默认上限都在 2500 token 量级）：hook 上下文
+会叠加进每一轮，写长了会挤占真正的工作内容。
 
 ## 何时读哪个 reference
 
